@@ -32,5 +32,5 @@ dependencies = [
     "sentence-transformers>=5.5.1",
     # Pinned to the known-good torch for sentence-transformers on macOS
     # (matches the working RAG_Course_Agents env).
-    "torch==2.11.0",
+    "torch==2.12.0",
 ]

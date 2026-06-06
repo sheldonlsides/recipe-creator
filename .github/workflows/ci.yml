@@ -33,4 +33,6 @@ jobs:
         run: uv run python -m compileall -q src main.py
 
       - name: Validate notebook JSON
-        run: uv run python -c "import nbformat; nbformat.read('src/recipe_builder.ipynb', as_version=4); print('notebook OK')"
+        # nbformat isn't a project dependency (the notebook is run via
+        # `uv run --with nbconvert`), so pull it in ephemerally for this check.
+        run: uv run --with nbformat python -c "import nbformat; nbformat.read('src/recipe_builder.ipynb', as_version=4); print('notebook OK')"

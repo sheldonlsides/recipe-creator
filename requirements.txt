@@ -18,7 +18,7 @@ langsmith[claude-agent-sdk]
 langsmith[openai-agents]
 anthropic
 langgraph-cli[inmem]
-torch==2.11.0
+torch==2.12.0
 pymupdf
 langchain_aws
 langgraph_checkpoint_aws

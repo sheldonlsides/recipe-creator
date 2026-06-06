@@ -32,11 +32,19 @@ Required by `src/model_factory.py` (fail-fast, no defaults):
 
 Provider credentials / service keys (by name): `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (Bedrock uses AWS credentials), `TAVILY_API_KEY` (recipe web search), `HF_TOKEN` (embeddings), `LANGSMITH_API_KEY` / `LANGSMITH_ENDPOINT` / `LANGSMITH_PROJECT` (tracing), `USER_AGENT`.
 
+Vector store selection (notebook):
+- `VECTOR_BACKEND` — `faiss` (default, local, zero-infra) | `pgvector` (PostgreSQL + pgvector).
+- `DATABASE_URL` — required **only** when `VECTOR_BACKEND=pgvector`, e.g. `postgresql+psycopg://dev:devpass@localhost:5432/appdb` (psycopg3 driver). Stand up the DB with `deploy/` (see `deploy/README.md`).
+
 ## Architecture
 
 **`src/model_factory.py`** — `create_model(provider, max_tokens, temperature, top_p)` returns a provider-agnostic LangChain `BaseChatModel` (bedrock/openai/anthropic), reading `LLM_PROVIDER` / `LLM_PROVIDER_MODEL` from env. Each agent gets its own instance: Chef at `temperature=0.7` (creative), Recipe & Planner at `0` (deterministic). Sampling params are only forwarded when non-None.
 
-**Nutrition vector store** — Built in-notebook from `src/data/opennutrition_foods.tsv` (~327K foods, capped to ~20K in dev) using local `sentence-transformers/all-MiniLM-L6-v2` embeddings (no API key). Persisted to `src/faiss_index/` (gitignored — regenerated on first run). Each `Document` embeds name + alternate names + description; metadata carries per-100g macros.
+**Nutrition vector store** — Built in-notebook from `src/data/opennutrition_foods.tsv` (~327K foods, capped to ~20K in dev) using local `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-dim, normalized, no API key). Each `Document` embeds name + alternate names + description; metadata carries per-100g macros. Two interchangeable backends selected by `VECTOR_BACKEND`:
+- **`faiss`** (default) — `build_or_load_index()`; persisted to `src/faiss_index/` (gitignored — regenerated on first run).
+- **`pgvector`** — `build_or_load_pgvector()`; loads to a PostgreSQL `opennutrition_foods` collection via `langchain-postgres` `PGVector` (cosine, `use_jsonb=True`, HNSW index built after bulk load). Idempotent via a row-count gate (no re-embed if already populated). Provisioned by `deploy/` (Docker Compose, `pgvector/pgvector:pg17`).
+
+Both paths share `embeddings`, `load_food_documents()`, and the 5,000-doc batched build with progress logging; a one-line dispatcher picks the backend and binds the global `vectorstore`, so `find_ingredients` / `retriever` and all downstream code are backend-agnostic. `similarity_search(query, k)` is identical across both.
 
 **LangGraph flow** over a shared `ChefState`:
 ```

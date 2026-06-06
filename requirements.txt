@@ -16,7 +16,7 @@ langsmith[claude-agent-sdk]
 langsmith[openai-agents]
 anthropic
 langgraph-cli[inmem]
-faiss-cpu==1.13.2
+faiss-cpu==1.14.2
 torch==2.11.0
 pymupdf
 langchain_aws

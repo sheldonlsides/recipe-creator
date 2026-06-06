@@ -18,8 +18,9 @@ services:
     ports:
       # Host 5433 (not 5432) to avoid colliding with a host-native Postgres that may
       # already own 5432. The notebook connects to localhost:5433; inside the container
-      # Postgres still listens on 5432.
-      - "5433:5432"
+      # Postgres still listens on 5432. Bound to 127.0.0.1 so the port is reachable
+      # only from this machine, not from other hosts on the network.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgvector_data:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro   # runs once, on first boot only

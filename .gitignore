@@ -18,6 +18,11 @@ src/data/
 # Virtual environments
 .venv
 
+# Editor / tooling / local agent config
+.claude/
+.vscode/
+.mcp.json
+
 # Built FAISS index (regenerate from recipe_builder.ipynb)
 src/faiss_index/
 

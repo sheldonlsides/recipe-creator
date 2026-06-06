@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Secrets / local env
+.env
+
+# macOS
+.DS_Store
+
+# Source nutrition dataset (269MB TSV, exceeds GitHub's 100MB limit; download separately)
+src/data/
+
+# Virtual environments
+.venv
+
+# Built FAISS index (regenerate from recipe_builder.ipynb)
+src/faiss_index/
+
+# Generated meal plans (output of the multi-agent meal planner)
+src/meal_plans/

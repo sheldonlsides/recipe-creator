@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A multi-agent meal planner built on LangGraph/LangChain. A **Chef** coordinator scope-gates the request and plans unique dishes per meal slot, fans out one parallel **Recipe** worker per slot (web search via Tavily + nutrition grounding via a local FAISS store), then fans in to a **Meal Planner** that enforces calorie caps and renders a deterministic markdown plan. The entire implementation lives in `src/recipe_builder.ipynb`; `main.py` is an unused stub.
+A multi-agent meal planner built on LangGraph/LangChain. A **Chef** coordinator scope-gates the request and plans unique dishes per meal slot, fans out one parallel **Recipe** worker per slot (web search via Tavily + nutrition grounding via a PostgreSQL + pgvector store), then fans in to a **Meal Planner** that enforces calorie caps and renders a deterministic markdown plan. The entire implementation lives in `src/recipe_builder.ipynb`; `main.py` is an unused stub.
 
 ## Commands
 
@@ -32,19 +32,18 @@ Required by `src/model_factory.py` (fail-fast, no defaults):
 
 Provider credentials / service keys (by name): `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (Bedrock uses AWS credentials), `TAVILY_API_KEY` (recipe web search), `HF_TOKEN` (embeddings), `LANGSMITH_API_KEY` / `LANGSMITH_ENDPOINT` / `LANGSMITH_PROJECT` (tracing), `USER_AGENT`.
 
-Vector store selection (notebook):
-- `VECTOR_BACKEND` — `faiss` (default, local, zero-infra) | `pgvector` (PostgreSQL + pgvector).
-- `DATABASE_URL` — required **only** when `VECTOR_BACKEND=pgvector`, e.g. `postgresql+psycopg://dev:devpass@localhost:5432/appdb` (psycopg3 driver). Stand up the DB with `deploy/` (see `deploy/README.md`).
+Vector store (notebook):
+- `DATABASE_URL` — **always required**; the nutrition store is PostgreSQL + pgvector, e.g. `postgresql+psycopg://dev:devpass@localhost:5432/appdb` (psycopg3 driver). Stand up the DB with `deploy/` (see `deploy/README.md`).
 
 ## Architecture
 
 **`src/model_factory.py`** — `create_model(provider, max_tokens, temperature, top_p)` returns a provider-agnostic LangChain `BaseChatModel` (bedrock/openai/anthropic), reading `LLM_PROVIDER` / `LLM_PROVIDER_MODEL` from env. Each agent gets its own instance: Chef at `temperature=0.7` (creative), Recipe & Planner at `0` (deterministic). Sampling params are only forwarded when non-None.
 
-**Nutrition vector store** — Built in-notebook from `src/data/opennutrition_foods.tsv` (~327K foods, capped to ~20K in dev) using local `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-dim, normalized, no API key). Each `Document` embeds name + alternate names + description; metadata carries per-100g macros. Two interchangeable backends selected by `VECTOR_BACKEND`:
-- **`faiss`** (default) — `build_or_load_index()`; persisted to `src/faiss_index/` (gitignored — regenerated on first run).
-- **`pgvector`** — `build_or_load_pgvector()`; loads to a PostgreSQL `opennutrition_foods` collection via `langchain-postgres` `PGVector` (cosine, `use_jsonb=True`, HNSW index built after bulk load). Idempotent via a row-count gate (no re-embed if already populated). Provisioned by `deploy/` (Docker Compose, `pgvector/pgvector:pg17`).
+**Nutrition vector store** — PostgreSQL + pgvector, built from `src/data/opennutrition_foods.tsv` (~327K foods, capped to ~20K in dev) using local `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-dim, normalized, no API key). Each `Document` embeds name + alternate names + description; metadata carries per-100g macros.
 
-Both paths share `embeddings`, `load_food_documents()`, and the 5,000-doc batched build with progress logging; a one-line dispatcher picks the backend and binds the global `vectorstore`, so `find_ingredients` / `retriever` and all downstream code are backend-agnostic. `similarity_search(query, k)` is identical across both.
+The backend lives in its own package, **`src/vectorstore/`** (`pgvector_backend.py`), built on the `langchain-postgres` **v2 API — `PGVectorStore` + `PGEngine`** (the deprecated `PGVector` class is intentionally not used). `build_or_load_pgvector(embeddings, load_documents, *, table_name, embed_dim, batch_size, …)` embeds in 5,000-doc batches with progress logging, loads into the `opennutrition_foods` table (one row per food; JSONB `langchain_metadata`, cosine distance, stable OpenNutrition id as a TEXT primary key), then builds an HNSW index via `store.apply_vector_index(...)`. Idempotent via a row-count gate (no re-embed if the table is already populated; drop the table to rebuild). Provisioned by `deploy/` (Docker Compose, `pgvector/pgvector:pg17`).
+
+The notebook keeps `embeddings` and `load_food_documents()` inline and **injects** them into `build_or_load_pgvector`, which binds the global `vectorstore`. `similarity_search(query, k)` and the consumption layer (`find_ingredients` / `retriever`) are unchanged.
 
 **LangGraph flow** over a shared `ChefState`:
 ```
@@ -56,7 +55,7 @@ START → chef_plan → (route_after_chef)
 - Fan-out uses `Send("recipe_worker", RecipeTask(...))`; fan-in relies on `recipes: Annotated[list[Recipe], operator.add]` to concatenate worker results.
 - `meal_planner` is the barrier: enforces per-day calorie caps by scaling portions (`_enforce_calories`), then renders markdown to `src/meal_plans/<slug>.md` (gitignored).
 
-**Shared agent tools** (`AGENT_TOOLS`): `find_ingredients` (FAISS top-k with per-100g macros), `total_meal` (scales per-100g by grams and sums), `tavily_search` (web recipe search), `fetch_recipe_page` (fetches a recipe URL, capped at `max_chars`).
+**Shared agent tools** (`AGENT_TOOLS`): `find_ingredients` (pgvector top-k with per-100g macros), `total_meal` (scales per-100g by grams and sums), `tavily_search` (web recipe search), `fetch_recipe_page` (fetches a recipe URL, capped at `max_chars`).
 
 ## Conventions
 

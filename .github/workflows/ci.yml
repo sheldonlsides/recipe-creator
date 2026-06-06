@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: this workflow only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party Actions are pinned to a full commit SHA (not a floating tag).
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Sanity checks that run without provider API keys or the large dataset.
+      # (Executing the notebook end to end needs secrets + a ~269MB download, so it
+      # is intentionally not run here. See README for the headless-execute command.)
+      - name: Byte-compile Python sources
+        run: uv run python -m compileall -q src main.py
+
+      - name: Validate notebook JSON
+        run: uv run python -c "import nbformat; nbformat.read('src/recipe_builder.ipynb', as_version=4); print('notebook OK')"

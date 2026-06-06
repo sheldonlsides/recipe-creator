@@ -22,9 +22,10 @@ src/data/
 .claude/
 .vscode/
 .mcp.json
+CLAUDE.md
 
-# Built FAISS index (regenerate from recipe_builder.ipynb)
-src/faiss_index/
+# Local dependency-install helper script
+install_deps
 
 # Generated meal plans (output of the multi-agent meal planner)
 src/meal_plans/

@@ -1,13 +1,13 @@
 # pgvector backend — local setup
 
-This directory stands up **PostgreSQL 17 + pgvector** in Docker Desktop as an
-alternative to the default local FAISS store for the nutrition vector index
-(~327K OpenNutrition foods, `all-MiniLM-L6-v2`, 384-dim).
+This directory stands up **PostgreSQL 17 + pgvector** in Docker Desktop — the
+nutrition vector store for the project (~327K OpenNutrition foods,
+`all-MiniLM-L6-v2`, 384-dim).
 
 Only the **database** runs in a container. The notebook runs on your **host**
-(via `uv run`) and connects to the DB at `localhost:5433`. The backend is chosen
-at runtime by the `VECTOR_BACKEND` env var, so you can switch between FAISS and
-pgvector without code changes.
+(via `uv run`) and connects to the DB at `localhost:5433`. The backend code lives
+in `src/vectorstore/` and uses the `langchain-postgres` v2 API
+(`PGVectorStore` + `PGEngine`).
 
 > **Why port 5433?** The container publishes to host port **5433**, not the
 > Postgres default 5432, so it coexists with any host-native Postgres you may
@@ -81,18 +81,15 @@ uses cosine, matching the L2-normalized MiniLM embeddings.)
 In your project **`.env`**, set:
 
 ```ini
-VECTOR_BACKEND=pgvector
 DATABASE_URL=postgresql+psycopg://dev:devpass@localhost:5433/appdb
 ```
 
-- `VECTOR_BACKEND=pgvector` flips the notebook from FAISS to pgvector.
+- `DATABASE_URL` is required — it's the only thing pointing the app at the store.
 - `localhost:5433` is correct because the notebook runs on the host and reaches
   the container through the published port (**not** the compose service name `db`,
   which would only apply from inside another container on the same network).
 - `postgresql+psycopg://` selects the psycopg3 driver that `langchain-postgres`
   requires.
-
-To switch back at any time, set `VECTOR_BACKEND=faiss` (the default).
 
 ---
 
@@ -106,10 +103,10 @@ uv run --with nbconvert -- jupyter nbconvert --to notebook --execute src/recipe_
 
 On the **first** run the notebook embeds all ~327K foods on CPU and loads them
 into Postgres in batches (this takes **many minutes** — the embedding compute, not
-the database, is the bottleneck), then builds an HNSW cosine index. Progress prints
-as `embedded X/total ...`.
+the database, is the bottleneck), then builds an HNSW cosine index. Progress is
+logged as `embedded X/total ...`.
 
-Subsequent runs detect the populated collection and **load instantly** — no
+Subsequent runs detect the populated table and **load instantly** — no
 re-embedding.
 
 ---
@@ -118,7 +115,7 @@ re-embedding.
 
 ```bash
 docker exec -it recipe-pgvector psql -U dev -d appdb \
-  -c "SELECT count(*) FROM langchain_pg_embedding;"
+  -c "SELECT count(*) FROM opennutrition_foods;"
 ```
 
 The count should equal `MAX_ROWS` from the notebook config (full dataset:
@@ -126,7 +123,7 @@ The count should equal `MAX_ROWS` from the notebook config (full dataset:
 
 ```bash
 docker exec -it recipe-pgvector psql -U dev -d appdb \
-  -c "\di langchain_pg_embedding*"
+  -c "\di opennutrition_foods*"
 ```
 
 ---
@@ -147,9 +144,6 @@ docker exec -it recipe-pgvector psql -U dev -d appdb -c "ALTER EXTENSION vector 
 
 # Back up the database (custom format)
 docker exec -t recipe-pgvector pg_dump -U dev -Fc appdb > appdb.dump
-
-# Switch the app back to FAISS (no container needed)
-#   set VECTOR_BACKEND=faiss in .env
 ```
 
 ---
@@ -168,19 +162,18 @@ more RAM, then `down` and `up -d` again.
 **`count(*)` returns 0 after a restart** — you likely ran `down -v`, which deletes
 the volume. Re-run the build (step 4). A plain `down` preserves the data.
 
-**Re-running the build / duplicates** — the load is **idempotent**: each food is
-upserted under its stable OpenNutrition id, so re-running the notebook (or resuming
-a build) never creates duplicate rows. A normal restart also skips re-embedding
-entirely once the collection is populated (a row-count gate short-circuits). If a
-**first** build was interrupted partway, the gate treats the partial collection as
-complete — force a clean rebuild by wiping it:
+**Re-running the build** — re-running the notebook **skips re-embedding** once the
+table is populated: a **row-count gate** short-circuits to the instant load path.
+Each food keeps its stable OpenNutrition id as a TEXT primary key, so rows stay
+traceable. If a **first** build was interrupted partway, the gate treats the
+partial table as complete — force a clean rebuild by wiping it:
 
 ```bash
 # nuke everything (simplest) — then re-run the build
 docker compose -f deploy/docker-compose.yml down -v && docker compose -f deploy/docker-compose.yml up -d
-# …or drop just the langchain tables, keeping the container/volume:
+# …or drop just the vector table, keeping the container/volume:
 docker exec -it recipe-pgvector psql -U dev -d appdb \
-  -c "DROP TABLE IF EXISTS langchain_pg_embedding, langchain_pg_collection CASCADE;"
+  -c "DROP TABLE IF EXISTS opennutrition_foods CASCADE;"
 ```
 
 **Connecting with an external client** (DBeaver / TablePlus / `psql`):
@@ -190,6 +183,6 @@ host=localhost  port=5433  user=dev  password=devpass  dbname=appdb
 ```
 or the URL `postgresql://dev:devpass@localhost:5433/appdb`.
 
-**Collection name** — the notebook stores everything under the
-`opennutrition_foods` collection in `langchain_pg_collection`; the actual vectors
-and JSONB metadata live in `langchain_pg_embedding`.
+**Table name** — `PGVectorStore` stores everything in a single
+`opennutrition_foods` table (public schema): content, the `vector(384)` embedding,
+and the JSONB `langchain_metadata` column, keyed by a TEXT `langchain_id`.

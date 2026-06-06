@@ -9,6 +9,8 @@ ipywidgets
 langchain-huggingface
 langchain-experimental
 langchain-community
+langchain-postgres
+langchain-tavily
 langgraph
 langgraph-checkpoint
 importlib
@@ -16,10 +18,11 @@ langsmith[claude-agent-sdk]
 langsmith[openai-agents]
 anthropic
 langgraph-cli[inmem]
-faiss-cpu==1.13.2
 torch==2.11.0
 pymupdf
 langchain_aws
 langgraph_checkpoint_aws
 langchain_huggingface
 pandas
+pgvector
+psycopg[binary]

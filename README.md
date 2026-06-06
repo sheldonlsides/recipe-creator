@@ -48,6 +48,11 @@ See [`## Example output`](#example-output) for a representative generated plan.
   every number the user sees.
 - **A provider-agnostic model factory**: one `create_model()` call swaps between Bedrock, OpenAI,
   and Anthropic with no code changes.
+- **A notebook that asserts its own claims**: the final cells run as a verification pass — a scope
+  probe confirms the input gate refuses off-topic and jailbreak inputs before any tool runs; an
+  injection probe patches the page fetch to return a poisoned page and confirms the agents ignore
+  the embedded payload while the calorie barrier still holds; a determinism probe confirms rendered
+  macros match a fresh `total_meal()` computation. If the notebook runs end to end, the claims hold.
 
 ## Why this exists
 
@@ -106,7 +111,7 @@ Colab button. The Quick start below gets you running in a few commands.
 | Path | Purpose |
 |------|---------|
 | `src/recipe_builder.ipynb` | The whole thing: vector store, tools, guardrails, agents, graph, and example runs, top to bottom. |
-| `src/model_factory.py` | `create_model()`: provider-agnostic LangChain chat model (Bedrock / OpenAI / Anthropic), fail-fast on missing config. |
+| `src/common/model_factory.py` | `create_model()`: provider-agnostic LangChain chat model (Bedrock / OpenAI / Anthropic), fail-fast on missing config. |
 | `src/vectorstore/` | The pgvector backend (`build_or_load_pgvector`): idempotent build/load of the nutrition table. |
 | `deploy/` | Docker Compose for PostgreSQL + pgvector (`pgvector/pgvector:pg17`). See `deploy/README.md`. |
 | `docs/pgvector-setup.md` | pgvector tuning notes and the AWS RDS path. |

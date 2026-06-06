@@ -17,7 +17,7 @@ changes, and get them merged.
 ## Project layout
 
 This is a **notebook-first** project: the full workflow lives in `src/recipe_builder.ipynb`.
-Prefer extending the notebook over adding new modules. `src/model_factory.py` is the one
+Prefer extending the notebook over adding new modules. `src/common/model_factory.py` is the one
 standalone module (the provider-agnostic model factory); `main.py` is an unused stub.
 
 ## Making changes

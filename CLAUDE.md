@@ -26,7 +26,7 @@ Always run Python/notebooks through `uv run` so the project `.venv` (not Anacond
 
 ## Configuration (.env)
 
-Required by `src/model_factory.py` (fail-fast, no defaults):
+Required by `src/common/model_factory.py` (fail-fast, no defaults):
 - `LLM_PROVIDER` — `bedrock` | `openai` | `anthropic`
 - `LLM_PROVIDER_MODEL` — model id for that provider
 
@@ -37,7 +37,7 @@ Vector store (notebook):
 
 ## Architecture
 
-**`src/model_factory.py`** — `create_model(provider, max_tokens, temperature, top_p)` returns a provider-agnostic LangChain `BaseChatModel` (bedrock/openai/anthropic), reading `LLM_PROVIDER` / `LLM_PROVIDER_MODEL` from env. Each agent gets its own instance: Chef at `temperature=0.7` (creative), Recipe & Planner at `0` (deterministic). Sampling params are only forwarded when non-None.
+**`src/common/model_factory.py`** — `create_model(provider, max_tokens, temperature, top_p)` returns a provider-agnostic LangChain `BaseChatModel` (bedrock/openai/anthropic), reading `LLM_PROVIDER` / `LLM_PROVIDER_MODEL` from env. Each agent gets its own instance: Chef at `temperature=0.7` (creative), Recipe & Planner at `0` (deterministic). Sampling params are only forwarded when non-None.
 
 **Nutrition vector store** — PostgreSQL + pgvector, built from `src/data/opennutrition_foods.tsv` (~327K foods, capped to ~20K in dev) using local `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-dim, normalized, no API key). Each `Document` embeds name + alternate names + description; metadata carries per-100g macros.
 

@@ -35,6 +35,7 @@ Prompt caching: unlike the Strands factory there is no `cache_config` knob here.
 LangChain handles caching differently (server-side for OpenAI; per-request
 `cache_control` blocks for Anthropic/Bedrock), so it is intentionally omitted.
 """
+
 import os
 
 from langchain_core.language_models import BaseChatModel
@@ -50,19 +51,26 @@ def _bedrock(
 
     kwargs = {"model_id": model_id}
     region = os.getenv("AWS_REGION")
+
     if region:
         kwargs["region_name"] = region
+
     # ChatBedrock routes inference params through model_kwargs; pass each only when
     # set so the provider default applies otherwise.
     model_kwargs = {}
+
     if max_tokens is not None:
         model_kwargs["max_tokens"] = max_tokens
+
     if temperature is not None:
         model_kwargs["temperature"] = temperature
+
     if top_p is not None:
         model_kwargs["top_p"] = top_p
+
     if model_kwargs:
         kwargs["model_kwargs"] = model_kwargs
+
     return ChatBedrock(**kwargs)
 
 
@@ -75,13 +83,17 @@ def _openai(
     from langchain_openai import ChatOpenAI
 
     kwargs = {"model": model_id, "api_key": os.environ["OPENAI_API_KEY"]}
+
     # ChatOpenAI takes these as direct kwargs; pass only the ones the caller set.
     if max_tokens is not None:
         kwargs["max_tokens"] = max_tokens
+
     if temperature is not None:
         kwargs["temperature"] = temperature
+
     if top_p is not None:
         kwargs["top_p"] = top_p
+
     return ChatOpenAI(**kwargs)
 
 
@@ -99,10 +111,13 @@ def _anthropic(
         # Anthropic requires max_tokens; default to 4096 when the caller doesn't specify one.
         "max_tokens": max_tokens if max_tokens is not None else 4096,
     }
+
     if temperature is not None:
         kwargs["temperature"] = temperature
+
     if top_p is not None:
         kwargs["top_p"] = top_p
+
     return ChatAnthropic(**kwargs)
 
 
@@ -122,12 +137,15 @@ _PROVIDER_API_KEY_ENV = {
 
 def _require_env(name: str) -> str:
     """Return the env var value, or raise a clear error if it is unset/empty."""
+
     value = os.environ.get(name)
+
     if not value:
         raise EnvironmentError(
             f"Required environment variable {name!r} is not set. "
             f"Set it in your .env (or runtime env vars) before calling create_model()."
         )
+
     return value
 
 
@@ -156,7 +174,9 @@ def create_model(
       - the provider's API key: OPENAI_API_KEY (openai) / ANTHROPIC_API_KEY (anthropic).
         bedrock requires no API key (AWS credentials / AWS_REGION).
     """
+
     provider = (provider or _require_env("LLM_PROVIDER")).strip().lower()
+
     try:
         builder = _PROVIDERS[provider]
     except KeyError:
@@ -169,6 +189,7 @@ def create_model(
 
     # Validate the provider's credentials up-front (bedrock uses AWS creds, no key).
     key_env = _PROVIDER_API_KEY_ENV[provider]
+
     if key_env:
         _require_env(key_env)
 
@@ -184,4 +205,5 @@ def create_model(
     ]
     suffix = f" ({', '.join(parts)})" if parts else ""
     print(f"✅ Using {provider} model: {model_id}{suffix}")
+
     return builder(model_id, max_tokens, temperature, top_p)

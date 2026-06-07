@@ -1,5 +1,9 @@
 # LangGraph Fan-Out, Guardrails, and pgvector RAG: A Worked Example
 
+[![CI](https://github.com/sheldonlsides/recipe-creator/actions/workflows/ci.yml/badge.svg)](https://github.com/sheldonlsides/recipe-creator/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+
 A single LangGraph notebook that demonstrates three production patterns for tool-using agents:
 
 - **Fan-out / fan-in with `Send()`** and an `operator.add` reducer, joined at a barrier node that

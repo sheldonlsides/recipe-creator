@@ -93,6 +93,7 @@ def _table_row_count(database_url: str, table: str) -> int:
     except Exception as exc:
         # The table is created on first build; before that the count is just 0.
         logger.debug("Row-count gate: table %r not counted (%s)", table, exc)
+
         return 0
     finally:
         engine.dispose()
@@ -159,6 +160,7 @@ def build_or_load_pgvector(
 
     docs = load_documents()
     total = len(docs)
+    
     logger.info(
         "Building pgvector table %r: %d foods in batches of %d "
         "(one-time; may take many minutes) ...",
@@ -169,10 +171,12 @@ def build_or_load_pgvector(
 
     for start in range(0, total, batch_size):
         chunk = docs[start:start + batch_size]
+        
         # Stable per-food ids keep rows traceable to their OpenNutrition source.
         ids = [doc.metadata["id"] for doc in chunk]
         store.add_documents(chunk, ids=ids)
         done = min(start + batch_size, total)
+
         logger.info(
             "  embedded %d/%d (%d%%) - %.0fs elapsed",
             done, total, done * 100 // total, time.time() - start_time,
@@ -184,6 +188,7 @@ def build_or_load_pgvector(
         m=hnsw_m,
         ef_construction=hnsw_ef_construction,
     ))
+
     logger.info(
         "Built pgvector table: %d foods in %.0fs (HNSW index ready)",
         total, time.time() - start_time,

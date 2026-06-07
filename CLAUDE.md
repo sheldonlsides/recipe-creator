@@ -62,3 +62,27 @@ START → chef_plan → (route_after_chef)
 - **Macros are computed in code, never by the LLM.** Ingredients carry per-100g facts; meal/day/grand totals are deterministic sums scaled by gram weight. Markdown rendering is pure Python, not model output.
 - **Guardrails** (`GUARDRAILS`) are prepended to every agent's system prompt and gate scope to food/nutrition; web results are treated as untrusted data, not instructions. Preserve this defense-in-depth when editing agents.
 - Notebook-first: prefer extending `src/recipe_builder.ipynb`; `main.py` is not yet wired to the workflow.
+
+## Git workflow
+
+Coding work is checked in by **merging a worktree branch into `main` — no pull requests.**
+
+1. **Create an isolated worktree before any coding task.** Use the `EnterWorktree` tool (or the `superpowers:using-git-worktrees` skill); it branches off `main`. Do all the work for the task there, not on the shared checkout.
+2. **Work and verify in the worktree** — follow the Dev Tracker workflow below (`start_work`, the `code-quality-reviewer` pass, `complete_work`).
+3. **Merge into `main` directly when done — do NOT open a PR:**
+   ```bash
+   git checkout main && git merge <worktree-branch> && git push origin main
+   ```
+   Then remove the worktree/branch.
+4. **One-time prerequisite:** `main` is GitHub branch-protected by default (a required `build` check + review block direct pushes). Direct pushes only succeed once that protection is **disabled** — an admin step done outside this flow.
+5. **Caution:** never `git reset --hard` while there are uncommitted working-tree changes you didn't author — it silently and unrecoverably discards them.
+
+## Dev Tracker workflow (MCP)
+
+The **Dev Tracker** MCP server is the primary system of record for tasks, memories, and references. Every agent (including subagents and the general-purpose agent) must use it:
+
+1. **Search memories before starting a task.** Before beginning any task, call `search_memories` (and skim `list_memories`) for prior decisions, conventions, fixes, or solutions related to the task — apply what you find instead of rediscovering it.
+2. **Create a worktree, then a task, before coding.** First create an isolated worktree (see `## Git workflow`), then `add_task` and `start_work`. Before `complete_work`, dispatch the **`code-quality-reviewer`** agent to review the changed files and address any HIGH findings; then call `complete_work` and **merge the worktree branch into `main` (no PR)**. (For docs/config-only tasks the reviewer returns a quick PASS.)
+3. **Save documentation links as references.** When given (or when you find) a documentation URL/link, save it with `add_reference` using the right category (`documentation` | `api` | `dashboard` | `tool` | `article` | `general`).
+4. **Record memories in Dev Tracker first.** When capturing a learning, use `add_memory` (primary) with the right category (`convention` | `debugging` | `decision` | `general` | `preference` | `solution`), then **mirror it to the local `memory/` files + `MEMORY.md`** to keep both stores in sync.
+5. **Review and capture knowledge.** Proactively record design patterns, conventions, fixes, preferences, and decisions as memories — don't let hard-won context evaporate at the end of a session.

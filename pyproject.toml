@@ -30,7 +30,5 @@ dependencies = [
     "pypdf>=6.13.0",
     "python-dotenv>=1.2.2",
     "sentence-transformers>=5.5.1",
-    # Pinned to the known-good torch for sentence-transformers on macOS
-    # (matches the working RAG_Course_Agents env).
     "torch==2.12.0",
 ]

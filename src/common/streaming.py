@@ -86,6 +86,7 @@ def _relay_update(
     if node == _CHEF_PLAN and update.get("planned"):
         planned = update["planned"]
         printer(f"👩‍🍳 chef planned {len(planned)} unique meal(s):")
+
         for meal in planned:
             printer(f"   • {meal.slot}: {meal.dish}")
 

@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A multi-agent meal planner built on LangGraph/LangChain. A **Chef** coordinator scope-gates the request and plans unique dishes per meal slot, fans out one parallel **Recipe** worker per slot (web search via Tavily + nutrition grounding via a PostgreSQL + pgvector store), then fans in to a **Meal Planner** that enforces calorie caps and renders a deterministic markdown plan. The entire implementation lives in `src/recipe_builder.ipynb`; `main.py` is an unused stub.
 
+## Before you start (non-negotiable)
+
+**Every agent — the main agent, every subagent, and the general-purpose agent — MUST create an isolated worktree before starting any work.** Use the `EnterWorktree` tool (or the `superpowers:using-git-worktrees` skill); it branches off `main`. This is mandatory before you make **any** edit or run **any** non-read-only command — no exceptions, no "it's just a one-line change." Do not touch the shared `main` checkout.
+
+- Read-only exploration (reading files, `grep`, `git status`, searching memories) is fine without a worktree.
+- The moment a task involves editing a file, writing a file, or running a command that changes state, stop and create the worktree first.
+- This applies to docs/config edits too, not just code.
+
+See `## Git workflow` for how the worktree is merged back into `main`.
+
 ## Commands
 
 Package manager is **uv** (Python 3.12). There is no test or lint tooling configured.
@@ -67,7 +77,7 @@ START → chef_plan → (route_after_chef)
 
 Coding work is checked in by **merging a worktree branch into `main` — no pull requests.**
 
-1. **Create an isolated worktree before any coding task.** Use the `EnterWorktree` tool (or the `superpowers:using-git-worktrees` skill); it branches off `main`. Do all the work for the task there, not on the shared checkout.
+1. **Create an isolated worktree before any coding task — this is mandatory for every agent, including subagents and the general-purpose agent** (see `## Before you start (non-negotiable)`). Use the `EnterWorktree` tool (or the `superpowers:using-git-worktrees` skill); it branches off `main`. Do all the work for the task there, never on the shared `main` checkout.
 2. **Work and verify in the worktree** — follow the Dev Tracker workflow below (`start_work`, the `code-quality-reviewer` pass, `complete_work`).
 3. **Merge into `main` directly when done — do NOT open a PR:**
    ```bash
@@ -82,7 +92,7 @@ Coding work is checked in by **merging a worktree branch into `main` — no pull
 The **Dev Tracker** MCP server is the primary system of record for tasks, memories, and references. Every agent (including subagents and the general-purpose agent) must use it:
 
 1. **Search memories before starting a task.** Before beginning any task, call `search_memories` (and skim `list_memories`) for prior decisions, conventions, fixes, or solutions related to the task — apply what you find instead of rediscovering it.
-2. **Create a worktree, then a task, before coding.** First create an isolated worktree (see `## Git workflow`), then `add_task` and `start_work`. Before `complete_work`, dispatch the **`code-quality-reviewer`** agent to review the changed files and address any HIGH findings; then call `complete_work` and **merge the worktree branch into `main` (no PR)**. (For docs/config-only tasks the reviewer returns a quick PASS.)
+2. **Create a worktree, then a task, before coding.** First create an isolated worktree — **mandatory before any work, for every agent and subagent** (see `## Before you start (non-negotiable)` and `## Git workflow`) — then `add_task` and `start_work`. Before `complete_work`, dispatch the **`code-quality-reviewer`** agent to review the changed files and address any HIGH findings; then call `complete_work` and **merge the worktree branch into `main` (no PR)**. (For docs/config-only tasks the reviewer returns a quick PASS.)
 3. **Save documentation links as references.** When given (or when you find) a documentation URL/link, save it with `add_reference` using the right category (`documentation` | `api` | `dashboard` | `tool` | `article` | `general`).
 4. **Record memories in Dev Tracker first.** When capturing a learning, use `add_memory` (primary) with the right category (`convention` | `debugging` | `decision` | `general` | `preference` | `solution`), then **mirror it to the local `memory/` files + `MEMORY.md`** to keep both stores in sync.
 5. **Review and capture knowledge.** Proactively record design patterns, conventions, fixes, preferences, and decisions as memories — don't let hard-won context evaporate at the end of a session.
